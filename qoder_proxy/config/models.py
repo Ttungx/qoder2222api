@@ -51,6 +51,13 @@ class QoderConfig(BaseModel):
     client_version: str = "0.1.43"
 
 
+def default_model_aliases() -> list[ModelAliasConfig]:
+    return [
+        ModelAliasConfig(alias="claude-sonnet-4-5", qoder_key="lite", qoder_source="system"),
+        ModelAliasConfig(alias="gpt-5-codex", qoder_key="lite", qoder_source="system"),
+    ]
+
+
 class ProxyConfig(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
@@ -59,18 +66,13 @@ class ProxyConfig(BaseModel):
     accounts: AccountsConfig = Field(default_factory=AccountsConfig)
     account_seeds: list[AccountConfig] = Field(default_factory=list)
     qoder: QoderConfig = Field(default_factory=QoderConfig)
-    models: list[ModelAliasConfig] = Field(default_factory=list)
+    models: list[ModelAliasConfig] = Field(default_factory=default_model_aliases)
 
     def resolved_models(self) -> list[ModelInfo]:
         return [ModelInfo(**model.model_dump()) for model in self.models]
 
 
-DEFAULT_CONFIG = ProxyConfig(
-    models=[
-        ModelAliasConfig(alias="claude-sonnet-4-5", qoder_key="lite", qoder_source="system"),
-        ModelAliasConfig(alias="gpt-5-codex", qoder_key="lite", qoder_source="system"),
-    ]
-)
+DEFAULT_CONFIG = ProxyConfig()
 
 
 def default_config_yaml() -> str:

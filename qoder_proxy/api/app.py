@@ -23,10 +23,29 @@ from qoder_proxy.config import ModelResolver, ProxyConfig, load_config, model_to
 from qoder_proxy.qoder.mock import execute_mock
 
 
-def create_app(config: ProxyConfig | None = None) -> FastAPI:
+def create_app(
+    config: ProxyConfig | None = None,
+    *,
+    account_pool: Any | None = None,
+    qoder_executor: Any | None = None,
+) -> FastAPI:
     config = config or load_config()
     resolver = ModelResolver(config.models)
     app = FastAPI(title="Qoder Proxy", version="0.1.0")
+
+    async def execute_request(canonical: Any) -> tuple[Any | None, AsyncIterator[Any]]:
+        if config.executor.mode == "mock":
+            return None, execute_mock(canonical)
+        if account_pool is None or qoder_executor is None:
+            raise CanonicalError(
+                ErrorCode.NO_AVAILABLE_ACCOUNT,
+                "Qoder executor mode requires account pool and executor",
+                http_status=503,
+                retryable=True,
+            )
+        model = canonical.resolved_model
+        account = await account_pool.select_for_model(model.qoder_key if model else canonical.model)
+        return account, qoder_executor.execute(canonical, account)
 
     @app.middleware("http")
     async def api_key_middleware(request: Request, call_next: Any) -> Any:
@@ -59,13 +78,16 @@ def create_app(config: ProxyConfig | None = None) -> FastAPI:
             request = AnthropicMessageRequest.model_validate(payload)
             model = resolver.resolve(request.model)
             canonical = anthropic_to_canonical(request, model)
-            events = execute_mock(canonical)
+            account, events = await execute_request(canonical)
             if request.stream:
                 return StreamingResponse(
                     _stream_with_errors(canonical_events_to_sse(events, model=request.model)),
                     media_type="text/event-stream",
                 )
-            return await canonical_events_to_message(events, model=request.model)
+            response = await canonical_events_to_message(events, model=request.model)
+            if account is not None:
+                account_pool.apply_success(account.id)
+            return response
         except ValidationError as exc:
             raise _http_error(
                 CanonicalError(ErrorCode.INVALID_REQUEST, exc.errors()[0]["msg"], http_status=400)
@@ -79,13 +101,16 @@ def create_app(config: ProxyConfig | None = None) -> FastAPI:
             request = OpenAIChatRequest.model_validate(payload)
             model = resolver.resolve(request.model)
             canonical = openai_to_canonical(request, model)
-            events = execute_mock(canonical)
+            account, events = await execute_request(canonical)
             if request.stream:
                 return StreamingResponse(
                     _stream_with_errors(canonical_events_to_chat_sse(events, model=request.model)),
                     media_type="text/event-stream",
                 )
-            return await canonical_events_to_chat_completion(events, model=request.model)
+            response = await canonical_events_to_chat_completion(events, model=request.model)
+            if account is not None:
+                account_pool.apply_success(account.id)
+            return response
         except ValidationError as exc:
             raise _openai_http_error(
                 CanonicalError(ErrorCode.INVALID_REQUEST, exc.errors()[0]["msg"], http_status=400)
