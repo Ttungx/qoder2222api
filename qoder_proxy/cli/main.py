@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import uvicorn
 
-from qoder_proxy.accounts import Account, JsonAccountStorage
+from qoder_proxy.accounts import Account, JsonAccountStorage, LocalQoderImportProvider
 from qoder_proxy.config import ModelResolver, default_config_yaml, load_config
 
 
@@ -16,6 +16,7 @@ def main() -> None:
     serve_parser.add_argument("--config", "-c", type=Path)
     serve_parser.add_argument("--host")
     serve_parser.add_argument("--port", type=int)
+    serve_parser.add_argument("--executor", choices=["mock", "qoder"])
     serve_parser.set_defaults(handler=_serve)
 
     config_parser = subparsers.add_parser("config", help="Manage config files.")
@@ -42,6 +43,28 @@ def main() -> None:
     account_list_parser = account_subparsers.add_parser("list", help="List accounts.")
     account_list_parser.add_argument("--storage", type=Path, default=Path("data/accounts.json"))
     account_list_parser.set_defaults(handler=_account_list)
+    account_remove_parser = account_subparsers.add_parser("remove", help="Remove an account.")
+    account_remove_parser.add_argument("account_id")
+    account_remove_parser.add_argument("--storage", type=Path, default=Path("data/accounts.json"))
+    account_remove_parser.set_defaults(handler=_account_remove)
+    account_login_parser = account_subparsers.add_parser(
+        "login",
+        help="Browser authorization import.",
+    )
+    account_login_parser.set_defaults(handler=_account_login)
+    account_import_local_parser = account_subparsers.add_parser(
+        "import-local",
+        help="Import local Qoder account state.",
+    )
+    account_import_local_parser.add_argument(
+        "--storage",
+        type=Path,
+        default=Path("data/accounts.json"),
+    )
+    account_import_local_parser.set_defaults(handler=_account_import_local)
+    account_check_parser = account_subparsers.add_parser("check", help="Check configured accounts.")
+    account_check_parser.add_argument("--storage", type=Path, default=Path("data/accounts.json"))
+    account_check_parser.set_defaults(handler=_account_check)
 
     args = parser.parse_args()
     args.handler(args)
@@ -49,6 +72,13 @@ def main() -> None:
 
 def _serve(args: argparse.Namespace) -> None:
     proxy_config = load_config(args.config)
+    if args.executor:
+        proxy_config.executor.mode = args.executor
+    if proxy_config.executor.mode == "qoder":
+        print(
+            "Real Qoder executor mode is available through create_app() integration tests; "
+            "direct CLI wiring will be completed after manual credential verification."
+        )
     uvicorn.run(
         "qoder_proxy.api.app:create_app",
         factory=True,
@@ -95,6 +125,30 @@ def _account_list(args: argparse.Namespace) -> None:
         return
     for account in accounts:
         print(f"{account.id}\t{account.display_name}\t{account.source}\t{account.health}")
+
+
+def _account_remove(args: argparse.Namespace) -> None:
+    JsonAccountStorage(args.storage).remove(args.account_id)
+    print(f"Removed account {args.account_id}")
+
+
+def _account_login(args: argparse.Namespace) -> None:
+    print("Browser login is not implemented for this Qoder flow yet")
+    raise SystemExit(1)
+
+
+def _account_import_local(args: argparse.Namespace) -> None:
+    storage = JsonAccountStorage(args.storage)
+    accounts = LocalQoderImportProvider().import_accounts()
+    for account in accounts:
+        storage.save(account)
+    print(f"Imported {len(accounts)} local account(s)")
+
+
+def _account_check(args: argparse.Namespace) -> None:
+    accounts = JsonAccountStorage(args.storage).list()
+    for account in accounts:
+        print(f"{account.id}\t{account.display_name}\t{account.health}")
 
 
 if __name__ == "__main__":
