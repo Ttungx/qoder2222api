@@ -14,7 +14,7 @@ from qoder_proxy.accounts.providers import (
 from qoder_proxy.accounts.scheduler import AccountScheduler
 from qoder_proxy.accounts.storage import JsonAccountStorage
 from qoder_proxy.canonical.errors import CanonicalError, ErrorCode
-from qoder_proxy.qoder.session import AuthIdentity, MachineIdentity
+from qoder_proxy.qoder.session import AuthIdentity, MachineIdentity, SessionBuilder
 
 
 class FakeAuthClient:
@@ -42,6 +42,8 @@ def test_pat_provider_refreshes_identity_from_pat_env(monkeypatch: pytest.Monkey
         assert refreshed.machine.machine_id
         assert refreshed.machine.machine_token
         assert refreshed.machine.machine_type
+        assert refreshed.session_info
+        assert refreshed.session_cosy_key
 
     asyncio.run(run())
 
@@ -91,7 +93,14 @@ def test_account_pool_selects_and_refreshes_pat_account(
 
         assert account.id == "acct_1"
         assert account.identity.uid == "user-1"
+        assert account.session_info
+        assert account.session_cosy_key
         assert storage.get("acct_1").identity.uid == "user-1"
+        assert storage.get("acct_1").session_info is None
+
+        account = await pool.select_for_model("lite")
+        assert account.session_info
+        assert account.session_cosy_key
 
     asyncio.run(run())
 
@@ -122,3 +131,49 @@ def test_account_pool_marks_rate_limit_cooldown(tmp_path: Path) -> None:
     assert account.enabled is True
     assert account.health is AccountHealth.RATE_LIMITED
     assert account.cooldown_until > datetime.now(UTC) + timedelta(seconds=1)
+
+
+def test_scheduler_reuses_transient_error_account_after_cooldown() -> None:
+    account = Account(
+        id="acct_1",
+        display_name="main",
+        source="pat",
+        health=AccountHealth.RATE_LIMITED,
+        cooldown_until=datetime.now(UTC) - timedelta(seconds=1),
+    )
+
+    selected = AccountScheduler([account]).select("lite")
+
+    assert selected.id == "acct_1"
+
+
+def test_account_storage_redacts_sensitive_fields(tmp_path: Path) -> None:
+    identity = AuthIdentity(
+        uid="user-1",
+        security_oauth_token="oauth-token",
+        refresh_token="refresh-token",
+    )
+    machine = MachineIdentity(machine_id="mid", machine_token="mtok", machine_type="mtype")
+    session = SessionBuilder.new_session(identity, machine, temp_key=b"1234567890abcdef")
+    storage = JsonAccountStorage(tmp_path / "accounts.json")
+
+    storage.save(
+        Account(
+            id="acct_1",
+            display_name="main",
+            source="pat",
+            pat="pat-secret",
+            identity=identity,
+            machine=machine,
+            session_info=session.info,
+            session_cosy_key=session.cosy_key,
+        )
+    )
+
+    raw = (tmp_path / "accounts.json").read_text(encoding="utf-8")
+
+    assert "pat-secret" not in raw
+    assert "oauth-token" not in raw
+    assert "refresh-token" not in raw
+    assert session.info not in raw
+    assert session.cosy_key not in raw

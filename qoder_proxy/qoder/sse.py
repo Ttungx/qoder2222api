@@ -1,6 +1,7 @@
 import json
 from typing import Any
 
+from qoder_proxy.canonical.errors import CanonicalError, ErrorCode
 from qoder_proxy.canonical.types import CanonicalEvent, CanonicalToolCall
 
 
@@ -11,8 +12,13 @@ def parse_qoder_sse_data(data: str) -> list[CanonicalEvent]:
         if not body:
             return []
         inner = json.loads(body)
-    except json.JSONDecodeError:
-        return []
+    except json.JSONDecodeError as exc:
+        raise CanonicalError(
+            ErrorCode.STREAM_INTERRUPTED,
+            "Malformed Qoder SSE payload",
+            http_status=502,
+            retryable=True,
+        ) from exc
 
     events: list[CanonicalEvent] = []
     for choice in inner.get("choices") or []:

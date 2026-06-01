@@ -1,4 +1,5 @@
 import copy
+import time
 from typing import Any
 from uuid import uuid4
 
@@ -72,7 +73,11 @@ def build_qoder_payload(request: CanonicalRequest, *, user_type: str) -> dict[st
     prompt = _latest_user_text(request)
     payload["chat_context"]["text"]["text"] = prompt
     payload["chat_context"]["extra"]["originalContent"]["text"] = prompt
-    payload["business"] = {"id": str(uuid4()), "name": prompt[:30], "begin_at": 0}
+    payload["business"] = {
+        "id": str(uuid4()),
+        "name": prompt[:30],
+        "begin_at": int(time.time() * 1000),
+    }
     payload["messages"] = [_message_to_qoder(message) for message in request.messages]
     if request.system:
         payload["messages"].insert(0, {"role": "system", "content": request.system, "contents": []})

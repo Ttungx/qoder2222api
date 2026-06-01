@@ -27,8 +27,11 @@ class AccountScheduler:
 def _available(account: Account, qoder_key: str) -> bool:
     if not account.enabled:
         return False
+    if account.cooldown_until:
+        if account.cooldown_until > datetime.now(UTC):
+            return False
+        account.health = AccountHealth.OK
+        account.cooldown_until = None
     if account.health is not AccountHealth.OK:
-        return False
-    if account.cooldown_until and account.cooldown_until > datetime.now(UTC):
         return False
     return account.supports_model(qoder_key)

@@ -1,5 +1,7 @@
 import json
+import time
 
+from qoder_proxy.canonical.errors import CanonicalError, ErrorCode
 from qoder_proxy.canonical.types import (
     CanonicalContentBlock,
     CanonicalMessage,
@@ -51,6 +53,16 @@ def test_parse_qoder_sse_data_extracts_text_delta() -> None:
     assert events[0].text == "hello"
 
 
+def test_parse_qoder_sse_data_raises_stream_interrupted_on_malformed_json() -> None:
+    try:
+        parse_qoder_sse_data("not-json")
+    except CanonicalError as error:
+        assert error.code is ErrorCode.STREAM_INTERRUPTED
+    else:
+        raise AssertionError("expected CanonicalError")
+
+
+
 def test_build_qoder_payload_sets_model_prompt_and_messages() -> None:
     request = CanonicalRequest(
         model="claude-sonnet-4-5",
@@ -75,6 +87,7 @@ def test_build_qoder_payload_sets_model_prompt_and_messages() -> None:
     assert payload["model_config"]["key"] == "lite"
     assert payload["model_config"]["source"] == "system"
     assert payload["chat_context"]["text"]["text"] == "hello qoder"
+    assert abs(payload["business"]["begin_at"] - int(time.time() * 1000)) < 5000
     assert payload["messages"][-1]["role"] == "user"
     assert payload["messages"][-1]["content"] == "hello qoder"
 

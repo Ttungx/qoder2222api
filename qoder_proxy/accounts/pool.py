@@ -30,7 +30,9 @@ class AccountPool:
                 http_status=503,
                 retryable=True,
             )
-        if account.source == "pat" and account.identity is None:
+        if account.source == "pat" and (
+            account.identity is None or not account.session_info or not account.session_cosy_key
+        ):
             if self.pat_provider is None:
                 raise CanonicalError(
                     ErrorCode.AUTHENTICATION_FAILED,

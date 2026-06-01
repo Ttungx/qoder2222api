@@ -81,7 +81,11 @@ def create_app(
             account, events = await execute_request(canonical)
             if request.stream:
                 return StreamingResponse(
-                    _stream_with_errors(canonical_events_to_sse(events, model=request.model)),
+                    _stream_with_errors(
+                        canonical_events_to_sse(events, model=request.model),
+                        account=account,
+                        account_pool=account_pool,
+                    ),
                     media_type="text/event-stream",
                 )
             response = await canonical_events_to_message(events, model=request.model)
@@ -104,7 +108,11 @@ def create_app(
             account, events = await execute_request(canonical)
             if request.stream:
                 return StreamingResponse(
-                    _stream_with_errors(canonical_events_to_chat_sse(events, model=request.model)),
+                    _stream_with_errors(
+                        canonical_events_to_chat_sse(events, model=request.model),
+                        account=account,
+                        account_pool=account_pool,
+                    ),
                     media_type="text/event-stream",
                 )
             response = await canonical_events_to_chat_completion(events, model=request.model)
@@ -121,16 +129,26 @@ def create_app(
     return app
 
 
-async def _stream_with_errors(source: AsyncIterator[str]) -> AsyncIterator[str]:
+async def _stream_with_errors(
+    source: AsyncIterator[str],
+    *,
+    account: Any | None = None,
+    account_pool: Any | None = None,
+) -> AsyncIterator[str]:
     try:
         async for item in source:
             yield item
     except CanonicalError as exc:
+        if account is not None and account_pool is not None:
+            account_pool.apply_error(account.id, exc)
         error_payload = {
             "type": "error",
             "error": {"type": str(exc.code), "message": exc.message},
         }
         yield f"event: error\ndata: {json.dumps(error_payload)}\n\n"
+    else:
+        if account is not None and account_pool is not None:
+            account_pool.apply_success(account.id)
 
 
 def _anthropic_error_payload(error: CanonicalError) -> dict[str, Any]:

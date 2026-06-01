@@ -4,7 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from qoder_proxy.accounts.models import Account
-from qoder_proxy.qoder.session import AuthIdentity, MachineIdentity
+from qoder_proxy.qoder.session import AuthIdentity, MachineIdentity, SessionBuilder
 
 
 class PATAccountProvider:
@@ -17,7 +17,15 @@ class PATAccountProvider:
             raise ValueError(f"No PAT available for account {account.id}")
         machine = account.machine or _new_machine()
         identity = await self.auth_client.exchange_pat(token, machine)
-        return account.model_copy(update={"identity": identity, "machine": machine})
+        session = SessionBuilder.new_session(identity, machine)
+        return account.model_copy(
+            update={
+                "identity": identity,
+                "machine": machine,
+                "session_info": session.info,
+                "session_cosy_key": session.cosy_key,
+            }
+        )
 
 
 class LocalQoderImportProvider:
