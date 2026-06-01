@@ -28,6 +28,37 @@ python -m ruff check .
 
 The current implementation includes Anthropic-compatible `/v1/messages`, OpenAI-compatible `/v1/chat/completions`, `/v1/models`, config/model aliases, JSON account storage, account scheduling primitives, Qoder wire helpers, and a mock executor. Real Qoder credential exchange and upstream execution are scaffolded at the module boundary but are not enabled by default.
 
+## Real Qoder executor mode
+
+Mock mode is the default and requires no credentials:
+
+```bash
+python -m qoder_proxy.cli.main serve --host 127.0.0.1 --port 8963
+```
+
+Create a PAT-backed account without storing the token directly:
+
+```bash
+export QODER_PAT=<your-token>
+python -m qoder_proxy.cli.main account add-pat --name main --pat-env QODER_PAT
+python -m qoder_proxy.cli.main account list
+```
+
+Enable real executor mode in `config.yaml`:
+
+```yaml
+executor:
+  mode: qoder
+accounts:
+  storage_path: ./data/accounts.json
+qoder:
+  center_base_url: https://center.qoder.sh
+  api_base_url: https://api3.qoder.sh
+  client_version: 0.1.43
+```
+
+Default tests never contact Qoder. Any real-account test must be opt-in and must redact tokens, machine identifiers, signatures, and bearer payloads from output.
+
 ## Client configuration
 
 ### Claude Code
