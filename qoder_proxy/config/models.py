@@ -37,12 +37,29 @@ class AccountConfig(BaseModel):
     enabled: bool = True
 
 
+class ExecutorConfig(BaseModel):
+    mode: str = Field(default="mock", pattern="^(mock|qoder)$")
+
+
+class AccountsConfig(BaseModel):
+    storage_path: str = "./data/accounts.json"
+
+
+class QoderConfig(BaseModel):
+    center_base_url: str = "https://center.qoder.sh"
+    api_base_url: str = "https://api3.qoder.sh"
+    client_version: str = "0.1.43"
+
+
 class ProxyConfig(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    executor: ExecutorConfig = Field(default_factory=ExecutorConfig)
+    accounts: AccountsConfig = Field(default_factory=AccountsConfig)
+    account_seeds: list[AccountConfig] = Field(default_factory=list)
+    qoder: QoderConfig = Field(default_factory=QoderConfig)
     models: list[ModelAliasConfig] = Field(default_factory=list)
-    accounts: list[AccountConfig] = Field(default_factory=list)
 
     def resolved_models(self) -> list[ModelInfo]:
         return [ModelInfo(**model.model_dump()) for model in self.models]
@@ -79,6 +96,14 @@ def load_config(path: str | Path | None = None) -> ProxyConfig:
         config.storage.path = storage_path
     if log_level := os.getenv("QODER_PROXY_LOG_LEVEL"):
         config.logging.level = log_level
+    if executor_mode := os.getenv("QODER_PROXY_EXECUTOR"):
+        config.executor.mode = executor_mode
+    if accounts_path := os.getenv("QODER_PROXY_ACCOUNTS_PATH"):
+        config.accounts.storage_path = accounts_path
+    if center_base_url := os.getenv("QODER_CENTER_BASE_URL"):
+        config.qoder.center_base_url = center_base_url
+    if api_base_url := os.getenv("QODER_API_BASE_URL"):
+        config.qoder.api_base_url = api_base_url
     return config
 
 
