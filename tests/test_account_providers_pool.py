@@ -1,14 +1,19 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
-from qoder_proxy.accounts.models import Account
+from qoder_proxy.accounts.models import Account, AccountHealth
+from qoder_proxy.accounts.pool import AccountPool
 from qoder_proxy.accounts.providers import (
     LocalQoderImportProvider,
     OAuthImportProvider,
     PATAccountProvider,
 )
+from qoder_proxy.accounts.scheduler import AccountScheduler
+from qoder_proxy.accounts.storage import JsonAccountStorage
+from qoder_proxy.canonical.errors import CanonicalError, ErrorCode
 from qoder_proxy.qoder.session import AuthIdentity, MachineIdentity
 
 
@@ -58,3 +63,62 @@ def test_local_import_provider_reads_json_identity(tmp_path: Path) -> None:
 def test_oauth_provider_reports_unsupported() -> None:
     with pytest.raises(NotImplementedError, match="Browser login is not implemented"):
         OAuthImportProvider().login()
+
+
+def test_account_pool_selects_and_refreshes_pat_account(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def run() -> None:
+        monkeypatch.setenv("QODER_PAT", "pat-secret")
+        storage = JsonAccountStorage(tmp_path / "accounts.json")
+        storage.save(
+            Account(
+                id="acct_1",
+                display_name="main",
+                source="pat",
+                pat_env="QODER_PAT",
+                supported_models=["lite"],
+            )
+        )
+        pool = AccountPool(
+            storage=storage,
+            scheduler_factory=AccountScheduler,
+            pat_provider=PATAccountProvider(FakeAuthClient()),
+        )
+
+        account = await pool.select_for_model("lite")
+
+        assert account.id == "acct_1"
+        assert account.identity.uid == "user-1"
+        assert storage.get("acct_1").identity.uid == "user-1"
+
+    asyncio.run(run())
+
+
+def test_account_pool_marks_auth_failure_disabled(tmp_path: Path) -> None:
+    storage = JsonAccountStorage(tmp_path / "accounts.json")
+    storage.save(Account(id="acct_1", display_name="main", source="pat"))
+    pool = AccountPool(storage=storage, scheduler_factory=AccountScheduler)
+
+    pool.apply_error(
+        "acct_1",
+        CanonicalError(ErrorCode.AUTHENTICATION_FAILED, "bad", http_status=401),
+    )
+
+    account = storage.get("acct_1")
+    assert account.enabled is False
+    assert account.health is AccountHealth.AUTH_FAILED
+
+
+def test_account_pool_marks_rate_limit_cooldown(tmp_path: Path) -> None:
+    storage = JsonAccountStorage(tmp_path / "accounts.json")
+    storage.save(Account(id="acct_1", display_name="main", source="pat"))
+    pool = AccountPool(storage=storage, scheduler_factory=AccountScheduler)
+
+    pool.apply_error("acct_1", CanonicalError(ErrorCode.RATE_LIMITED, "slow", http_status=429))
+
+    account = storage.get("acct_1")
+    assert account.enabled is True
+    assert account.health is AccountHealth.RATE_LIMITED
+    assert account.cooldown_until > datetime.now(UTC) + timedelta(seconds=1)
