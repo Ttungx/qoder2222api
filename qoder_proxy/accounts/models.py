@@ -1,7 +1,9 @@
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from qoder_proxy.qoder.session import AuthIdentity, MachineIdentity
 
 
 class AccountHealth(StrEnum):
@@ -19,6 +21,8 @@ class QuotaSnapshot(BaseModel):
 
 
 class Account(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     id: str
     display_name: str
     source: str
@@ -30,6 +34,10 @@ class Account(BaseModel):
     health: AccountHealth = AccountHealth.OK
     failure_count: int = 0
     cooldown_until: datetime | None = None
+    identity: AuthIdentity | None = None
+    machine: MachineIdentity | None = None
+    session_info: str | None = None
+    session_cosy_key: str | None = None
 
     def supports_model(self, qoder_key: str) -> bool:
         return not self.supported_models or qoder_key in self.supported_models
