@@ -1,0 +1,14 @@
+# Reference repositories
+references/repos/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+
+# Local runtime data
+data/
+*.log
