@@ -8,14 +8,26 @@ from qoder_proxy.canonical.types import CanonicalEvent, CanonicalToolCall
 def parse_qoder_sse_data(data: str) -> list[CanonicalEvent]:
     try:
         wrapper = json.loads(data)
-        body = wrapper.get("body") or ""
-        if not body:
-            return []
+    except json.JSONDecodeError as exc:
+        raise CanonicalError(
+            ErrorCode.STREAM_INTERRUPTED,
+            f"Malformed Qoder SSE wrapper: {data[:100]}",
+            http_status=502,
+            retryable=True,
+        ) from exc
+
+    body = wrapper.get("body") or ""
+    if not body:
+        return []
+    # Qoder signals end-of-stream with body="[DONE]"
+    if body == "[DONE]":
+        return []
+    try:
         inner = json.loads(body)
     except json.JSONDecodeError as exc:
         raise CanonicalError(
             ErrorCode.STREAM_INTERRUPTED,
-            "Malformed Qoder SSE payload",
+            f"Malformed Qoder SSE body: {body[:200]}",
             http_status=502,
             retryable=True,
         ) from exc
@@ -23,9 +35,15 @@ def parse_qoder_sse_data(data: str) -> list[CanonicalEvent]:
     events: list[CanonicalEvent] = []
     for choice in inner.get("choices") or []:
         delta = choice.get("delta") or {}
+        # Handle regular content
         content = delta.get("content")
         if content:
             events.append(CanonicalEvent(type="text_delta", text=content))
+        # Handle reasoning_content (thinking models like o1/o3/Claude with extended thinking)
+        reasoning = delta.get("reasoning_content")
+        if reasoning and not content:
+            events.append(CanonicalEvent(type="text_delta", text=reasoning))
+        # Handle tool calls
         for tool_call in delta.get("tool_calls") or []:
             function = tool_call.get("function") or {}
             events.append(

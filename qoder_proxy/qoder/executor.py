@@ -56,6 +56,7 @@ class QoderExecutor:
         ):
             if not line.startswith("data:"):
                 continue
-            for event in parse_qoder_sse_data(line.removeprefix("data:").strip()):
+            raw_data = line.removeprefix("data:").strip()
+            for event in parse_qoder_sse_data(raw_data):
                 yield event
         yield CanonicalEvent(type="response_stop", finish_reason="end_turn")

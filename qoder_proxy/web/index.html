@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qoder Proxy</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+
+<!-- Ambient glow -->
+<div class="ambient">
+  <div class="ambient-glow ambient-glow-1"></div>
+  <div class="ambient-glow ambient-glow-2"></div>
+</div>
+
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="sidebar-logo-text">Qoder2222API</span>
+      <span class="sidebar-logo-badge">v0.1</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="sidebar-section">总览</div>
+      <a class="sidebar-item active" data-page="dashboard" href="#">
+        <i data-lucide="layout-dashboard"></i>
+        <span>仪表盘</span>
+      </a>
+      <a class="sidebar-item" data-page="models" href="#">
+        <i data-lucide="boxes"></i>
+        <span>模型</span>
+      </a>
+
+      <div class="sidebar-section">管理</div>
+      <a class="sidebar-item" data-page="accounts" href="#">
+        <i data-lucide="users"></i>
+        <span>账户</span>
+      </a>
+      <a class="sidebar-item" data-page="endpoints" href="#">
+        <i data-lucide="plug"></i>
+        <span>接口</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-footer-item" onclick="openCmd()">
+        <i data-lucide="search"></i>
+        <span>搜索… <kbd style="margin-left:auto;padding:2px 6px;font-size:11px;background:rgba(255,255,255,0.08);border-radius:4px;color:var(--text-muted)">⌘K</kbd></span>
+      </div>
+      <div class="sidebar-footer-item">
+        <i data-lucide="settings"></i>
+        <span>设置</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content" id="app"></main>
+
+</div>
+
+<!-- Command Palette -->
+<div class="cmd-backdrop" id="cmdBackdrop" onclick="closeCmd()"></div>
+<div class="cmd-palette" id="cmdPalette">
+  <div class="cmd-search">
+    <i data-lucide="search"></i>
+    <input type="text" id="cmdInput" placeholder="输入命令或搜索…" autocomplete="off">
+  </div>
+  <div class="cmd-results" id="cmdResults"></div>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modalBackdrop" onclick="closeModal()"></div>
+<div class="modal" id="modal">
+  <div class="modal-title" id="modalTitle"></div>
+  <div id="modalBody"></div>
+  <div class="modal-actions" id="modalActions"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

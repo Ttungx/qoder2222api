@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 from uuid import uuid4
 
@@ -74,16 +75,20 @@ def _serve(args: argparse.Namespace) -> None:
     proxy_config = load_config(args.config)
     if args.executor:
         proxy_config.executor.mode = args.executor
+    # Pass executor mode via env var so factory-based create_app() picks it up
+    os.environ["QODER_PROXY_EXECUTOR"] = proxy_config.executor.mode
+    if args.host:
+        os.environ["QODER_PROXY_HOST"] = args.host
+    if args.port:
+        os.environ["QODER_PROXY_PORT"] = str(args.port)
     if proxy_config.executor.mode == "qoder":
-        print(
-            "Real Qoder executor mode is available through create_app() integration tests; "
-            "direct CLI wiring will be completed after manual credential verification."
-        )
+        print(f"[qoder-proxy] Starting in Qoder executor mode on "
+              f"{proxy_config.server.host}:{proxy_config.server.port}")
     uvicorn.run(
         "qoder_proxy.api.app:create_app",
         factory=True,
-        host=args.host or proxy_config.server.host,
-        port=args.port or proxy_config.server.port,
+        host=proxy_config.server.host,
+        port=proxy_config.server.port,
     )
 
 

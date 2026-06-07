@@ -82,7 +82,7 @@ class QoderAuthClient:
             "cosy-machineid": machine.machine_id,
             "user-agent": "Go-http-client/2.0",
         }
-        async with httpx.AsyncClient(transport=self.transport, timeout=15) as client:
+        async with httpx.AsyncClient(transport=self.transport, timeout=15, trust_env=False) as client:
             response = await client.post(
                 f"{self.center_base_url}{path}",
                 content=body,

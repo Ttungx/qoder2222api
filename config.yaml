@@ -1,0 +1,27 @@
+server:
+  host: "127.0.0.1"
+  port: 8963
+  api_keys: []
+  trusted_proxies: []
+storage:
+  path: "./data/qoder-proxy.db"
+logging:
+  level: "info"
+executor:
+  mode: "qoder"
+accounts:
+  storage_path: "./data/accounts.json"
+qoder:
+  center_base_url: "https://center.qoder.sh"
+  api_base_url: "https://api3.qoder.sh"
+  client_version: "0.1.43"
+models:
+  - alias: "claude-sonnet-4-5"
+    qoder_key: "lite"
+    qoder_source: "system"
+  - alias: "gpt-5-codex"
+    qoder_key: "lite"
+    qoder_source: "system"
+  - alias: "qwen3.7-max"
+    qoder_key: "qmodel"
+    qoder_source: "system"

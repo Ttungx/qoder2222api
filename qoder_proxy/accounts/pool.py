@@ -6,6 +6,7 @@ from qoder_proxy.accounts.providers import PATAccountProvider
 from qoder_proxy.accounts.scheduler import AccountScheduler
 from qoder_proxy.accounts.storage import JsonAccountStorage
 from qoder_proxy.canonical.errors import CanonicalError, ErrorCode
+from qoder_proxy.qoder.session import SessionBuilder
 
 
 class AccountPool:
@@ -41,6 +42,25 @@ class AccountPool:
                 )
             account = await self.pat_provider.refresh(account)
             self.storage.save(account)
+        elif account.source != "pat" and (
+            not account.session_info or not account.session_cosy_key
+        ):
+            # OAuth / local accounts: rebuild session from persisted identity
+            if account.identity is not None and account.machine is not None:
+                session = SessionBuilder.new_session(account.identity, account.machine)
+                account = account.model_copy(
+                    update={
+                        "session_info": session.info,
+                        "session_cosy_key": session.cosy_key,
+                    }
+                )
+                self.storage.save(account)
+            else:
+                raise CanonicalError(
+                    ErrorCode.AUTHENTICATION_FAILED,
+                    f"Account {account.id} has no identity/machine for session rebuild",
+                    http_status=401,
+                )
         return account
 
     def apply_success(self, account_id: str) -> None:

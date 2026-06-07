@@ -47,14 +47,11 @@ class JsonAccountStorage:
 
 
 def _stored_account(account: Account) -> dict[str, object]:
-    data = account.model_dump(mode="json")
-    data["pat"] = None
-    data["session_info"] = None
-    data["session_cosy_key"] = None
-    if data.get("identity"):
-        data["identity"]["security_oauth_token"] = ""
-        data["identity"]["refresh_token"] = ""
-    if data.get("machine"):
-        data["machine"]["machine_id"] = ""
-        data["machine"]["machine_token"] = ""
-    return data
+    """Serialize account for persistent storage.
+
+    All credential and session fields are preserved so that accounts survive
+    server restarts without requiring re-authentication.  The file should
+    be protected by OS-level permissions (chmod 600 / ACL) rather than
+    relying on field stripping.
+    """
+    return account.model_dump(mode="json")
