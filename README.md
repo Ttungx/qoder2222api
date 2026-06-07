@@ -1,8 +1,8 @@
 # Qoder Proxy
 
-Lightweight Python reverse proxy for exposing Qoder-backed models through Anthropic-compatible and OpenAI-compatible API surfaces.
+一个轻量级的 Python 反向代理，将 Qoder 后端的模型通过 Anthropic 兼容和 OpenAI 兼容的 API 表面暴露出来。
 
-## Local setup
+## 本地安装
 
 ```bash
 python -m venv .venv
@@ -10,7 +10,7 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
 
-## Commands
+## 常用命令
 
 ```bash
 python -m qoder_proxy.cli.main --help
@@ -19,32 +19,36 @@ python -m qoder_proxy.cli.main models list
 python -m qoder_proxy.cli.main serve --host 127.0.0.1 --port 8963
 ```
 
-## Validation
+服务启动后访问 `http://127.0.0.1:8963/` 即可打开 Web Dashboard。
+
+## 测试与校验
 
 ```bash
 python -m pytest
 python -m ruff check .
 ```
 
-The current implementation includes Anthropic-compatible `/v1/messages`, OpenAI-compatible `/v1/chat/completions`, `/v1/models`, config/model aliases, JSON account storage, account scheduling primitives, Qoder wire helpers, and a mock executor. Real Qoder credential exchange and upstream execution are scaffolded at the module boundary but are not enabled by default.
+当前实现包括：Anthropic 兼容的 `/v1/messages`、OpenAI 兼容的 `/v1/chat/completions`、`/v1/models`，配置/模型别名、JSON 账户存储、账户调度原语、Qoder 协议底层辅助模块，以及一个 Mock 执行器。真实 Qoder 凭证交换与上游执行已在模块边界完成脚手架，但默认未启用。
 
-## Real Qoder executor mode
+## 真实 Qoder 执行器模式
 
-Mock mode is the default and requires no credentials:
+Mock 模式为默认模式，无需任何凭证：
 
 ```bash
 python -m qoder_proxy.cli.main serve --host 127.0.0.1 --port 8963
 ```
 
-Create a PAT-backed account without storing the token directly:
+添加一个基于 PAT 的账户（不直接存储 token）：
 
 ```bash
-export QODER_PAT=<your-token>
+export QODER_PAT=<你的-token>
 python -m qoder_proxy.cli.main account add-pat --name main --pat-env QODER_PAT
 python -m qoder_proxy.cli.main account list
 ```
 
-Enable real executor mode in `config.yaml`:
+或在 Dashboard 中通过 OAuth 设备流登录，会自动保存会话。
+
+在 `config.yaml` 中启用真实执行器模式：
 
 ```yaml
 executor:
@@ -57,27 +61,38 @@ qoder:
   client_version: 0.1.43
 ```
 
-Default tests never contact Qoder. Any real-account test must be opt-in and must redact tokens, machine identifiers, signatures, and bearer payloads from output.
+默认的测试不会连接 Qoder。任何真实账户相关的测试必须显式开启，并且在输出中对 token、机器标识、签名和 bearer 载荷进行脱敏处理。
 
-## Client configuration
+## 客户端配置
 
 ### Claude Code
 
-Point Claude Code at the local Anthropic-compatible server using the model alias from config, for example `claude-sonnet-4-5`. If `server.api_keys` is configured, send the configured key as a bearer token.
+将 Claude Code 指向本地的 Anthropic 兼容服务，使用配置中的模型别名，例如 `claude-sonnet-4-5`。如果配置了 `server.api_keys`，请将配置的 key 作为 bearer token 发送。
 
-### OpenAI/Codex-compatible clients
+### OpenAI / Codex 兼容客户端
 
-Use this base URL:
+使用以下 base URL：
 
 ```text
 http://127.0.0.1:8963/v1
 ```
 
-Use a configured model alias such as `gpt-5-codex`. The first complete route is `/v1/chat/completions`; OpenAI Responses API is intentionally out of scope for now.
+使用配置好的模型别名，例如 `gpt-5-codex`。首个完整路由是 `/v1/chat/completions`；OpenAI Responses API 当前不在支持范围内。
 
-## Known limitations
+## Web Dashboard
 
-- Real Qoder upstream calls still require wiring account sessions into an executor.
-- Browser login and local Qoder account import are CLI placeholders for later completion.
-- Image/file content blocks are rejected or unsupported in the first version.
-- Public multi-tenant server operation is out of scope; only optional local API-key protection is provided.
+服务启动后，访问 `http://127.0.0.1:8963/` 即可使用 Web Dashboard。包含以下页面：
+
+- **总览**：服务状态、运行时长、累计请求数与成功率、按模型分组的请求统计
+- **模型**：列出配置中和运行时注册的模型别名，支持新增/删除运行时别名
+- **账户**：查看账户健康度、冷却时间，支持新增 PAT 账户、删除、启停、重置健康状态、触发 OAuth 设备流登录、导入本地 Qoder 账户
+- **接口**：展示可用的 API 路由与调用方式
+
+支持 `Ctrl/⌘ + K` 全局命令面板。
+
+## 已知限制
+
+- 真实 Qoder 上游调用仍需要把账户会话接入到执行器（首版已基本完成，多账户调度仍处于早期阶段）。
+- 部分 CLI 占位命令（如浏览器登录的细节流程）尚需完善。
+- 图片/文件内容块在首版中被拒绝或不支持。
+- 公开的多租户服务运行不在支持范围内；仅提供可选的本地 API Key 鉴权。
